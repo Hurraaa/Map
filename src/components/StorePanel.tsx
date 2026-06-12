@@ -27,6 +27,7 @@ export default function StorePanel({
           </h2>
           <p className="text-sm text-slate-400">
             {c.label} · {floorName}
+            {store.unit ? ` · No ${store.unit}` : ""}
           </p>
         </div>
         <button

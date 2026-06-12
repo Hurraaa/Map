@@ -9,9 +9,11 @@ import {
   CORRIDOR,
   ENTRANCE_X,
   FLOORS,
+  GATES,
   SHELL,
   VIEW,
   amenitiesOnFloor,
+  renovationsOnFloor,
   storesOnFloor,
   type FloorId,
   type Store,
@@ -47,8 +49,8 @@ function storeSvg(store: Store, selected = false): string {
   const fontSize = Math.min(
     22,
     Math.max(
-      11,
-      Math.min(w / (Math.max(...lines.map((l) => l.length)) * 0.62), h / 3.2)
+      9,
+      Math.min(w / (Math.max(...lines.map((l) => l.length)) * 0.74), h / 3.2)
     )
   );
   const y0 = cy - ((lines.length - 1) * fontSize * 0.6) / 2 + fontSize * 0.35;
@@ -58,11 +60,16 @@ function storeSvg(store: Store, selected = false): string {
         `<tspan x="${cx}" dy="${i === 0 ? 0 : fontSize * 1.15}">${esc(line)}</tspan>`
     )
     .join("");
+  const badge =
+    store.unit && h >= 70 && w >= 55
+      ? `<rect x="${x + 6}" y="${y + 6}" width="${14 + store.unit.length * 7}" height="17" rx="8.5" fill="#ffffff" opacity="0.9"/>
+         <text x="${x + 13 + (store.unit.length * 7) / 2}" y="${y + 18.5}" text-anchor="middle" font-size="11" font-weight="700" fill="#64748b">${esc(store.unit)}</text>`
+      : "";
   return `
     <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"
       fill="${c.fill}" stroke="${selected ? "#e2001a" : c.stroke}" stroke-width="${selected ? 4 : 1.5}"/>
     <text x="${cx}" y="${y0}" text-anchor="middle" font-size="${fontSize}"
-      font-weight="600" fill="${c.text}">${tspans}</text>`;
+      font-weight="600" fill="${c.text}">${tspans}</text>${badge}`;
 }
 
 function floorSvg(floor: FloorId): string {
@@ -86,18 +93,32 @@ function floorSvg(floor: FloorId): string {
     )
     .join("");
 
-  const ex = ENTRANCE_X.x + ENTRANCE_X.w / 2;
+  const gates = GATES.map((g) => {
+    const y = g.side === "S" ? SHELL.y + SHELL.h + 30 : SHELL.y - 14;
+    const arrow = g.side === "S" ? "▲" : "▼";
+    return `<text x="${g.x}" y="${y}" text-anchor="middle" font-size="16" font-weight="600" fill="#64748b">${arrow} ${esc(g.label)}</text>`;
+  }).join("");
+
+  const renovations = renovationsOnFloor(floor)
+    .map(
+      (r) => `
+      <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="24"
+        fill="#fafaf9" stroke="#d6d3d1" stroke-width="2" stroke-dasharray="10 8"/>
+      <text x="${r.x + r.w / 2}" y="${r.y + r.h / 2 - 10}" text-anchor="middle" font-size="20" font-style="italic" font-weight="600" fill="#f97316">Yenilenmeye burada</text>
+      <text x="${r.x + r.w / 2}" y="${r.y + r.h / 2 + 16}" text-anchor="middle" font-size="20" font-style="italic" font-weight="600" fill="#f97316">devam ediyoruz!</text>`
+    )
+    .join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW.w} ${VIEW.h}" font-family="DejaVu Sans, sans-serif">
     <rect width="${VIEW.w}" height="${VIEW.h}" fill="#f1f5f9"/>
-    <text x="60" y="80" font-size="34" font-weight="800" fill="#e2001a">ANKAmall</text>
-    <text x="280" y="80" font-size="26" font-weight="600" fill="#64748b">${esc(floorName)}</text>
+    <text x="60" y="120" font-size="34" font-weight="800" fill="#e2001a">ANKAmall</text>
+    <text x="280" y="120" font-size="26" font-weight="600" fill="#64748b">${esc(floorName)}</text>
     <rect x="${SHELL.x}" y="${SHELL.y}" width="${SHELL.w}" height="${SHELL.h}" rx="${SHELL.rx}" fill="#ffffff" stroke="#e2e8f0" stroke-width="3"/>
     <rect x="${CORRIDOR.x}" y="${CORRIDOR.y}" width="${CORRIDOR.w}" height="${CORRIDOR.h}" rx="36" fill="#f1f5f9"/>
     <rect x="${ENTRANCE_X.x}" y="${SHELL.y + 8}" width="${ENTRANCE_X.w}" height="${SHELL.h - 16}" rx="28" fill="#f1f5f9"/>
     ${atria}
-    <text x="${ex}" y="${SHELL.y + SHELL.h + 28}" text-anchor="middle" font-size="16" font-weight="600" fill="#64748b">▲ Ana Giriş</text>
-    <text x="${ex}" y="${SHELL.y - 16}" text-anchor="middle" font-size="16" font-weight="600" fill="#64748b">▼ Metro / Otopark</text>
+    ${gates}
+    ${renovations}
     ${stores.map((s) => storeSvg(s)).join("")}
     ${amenitySvg}
   </svg>`;

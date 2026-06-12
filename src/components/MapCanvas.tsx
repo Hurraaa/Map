@@ -13,9 +13,11 @@ import {
   CATEGORIES,
   CORRIDOR,
   ENTRANCE_X,
+  GATES,
   SHELL,
   VIEW,
   amenitiesOnFloor,
+  renovationsOnFloor,
   storesOnFloor,
   type FloorId,
   type Store,
@@ -56,6 +58,7 @@ export default function MapCanvas({
 
   const stores = useMemo(() => storesOnFloor(floor), [floor]);
   const amenities = useMemo(() => amenitiesOnFloor(floor), [floor]);
+  const renovations = useMemo(() => renovationsOnFloor(floor), [floor]);
 
   // İstemci koordinatını SVG kullanıcı koordinatına çevirir
   const toSvgPoint = useCallback((clientX: number, clientY: number) => {
@@ -339,9 +342,55 @@ export default function MapCanvas({
               )
             )}
 
-            {/* Girişler */}
-            <EntranceLabel x={ENTRANCE_X.x + ENTRANCE_X.w / 2} y={SHELL.y + SHELL.h + 28} label="Ana Giriş" dir="up" />
-            <EntranceLabel x={ENTRANCE_X.x + ENTRANCE_X.w / 2} y={SHELL.y - 16} label="Metro / Otopark" dir="down" />
+            {/* Kapılar */}
+            {GATES.map((g) => (
+              <EntranceLabel
+                key={g.label}
+                x={g.x}
+                y={g.side === "S" ? SHELL.y + SHELL.h + 30 : SHELL.y - 14}
+                label={g.label}
+                dir={g.side === "S" ? "up" : "down"}
+              />
+            ))}
+
+            {/* Tadilat bölgeleri */}
+            {renovations.map((r, i) => (
+              <g key={i} className="pointer-events-none">
+                <rect
+                  x={r.x}
+                  y={r.y}
+                  width={r.w}
+                  height={r.h}
+                  rx={24}
+                  fill="#fafaf9"
+                  stroke="#d6d3d1"
+                  strokeWidth="2"
+                  strokeDasharray="10 8"
+                />
+                <text
+                  x={r.x + r.w / 2}
+                  y={r.y + r.h / 2 - 10}
+                  textAnchor="middle"
+                  fontSize="20"
+                  fontStyle="italic"
+                  fontWeight={600}
+                  fill="#f97316"
+                >
+                  Yenilenmeye burada
+                </text>
+                <text
+                  x={r.x + r.w / 2}
+                  y={r.y + r.h / 2 + 16}
+                  textAnchor="middle"
+                  fontSize="20"
+                  fontStyle="italic"
+                  fontWeight={600}
+                  fill="#f97316"
+                >
+                  devam ediyoruz!
+                </text>
+              </g>
+            ))}
 
             {/* Mağazalar */}
             {stores.map((store) => (
@@ -432,7 +481,7 @@ function StoreShape({
   const lines = useMemo(() => splitLabel(store.name), [store.name]);
   const fontSize = Math.min(
     22,
-    Math.max(11, Math.min(w / (Math.max(...lines.map((l) => l.length)) * 0.62), h / 3.2))
+    Math.max(9, Math.min(w / (Math.max(...lines.map((l) => l.length)) * 0.74), h / 3.2))
   );
   const showLabel = fontSize * zoom >= 7;
 
@@ -471,6 +520,29 @@ function StoreShape({
             </tspan>
           ))}
         </text>
+      )}
+      {store.unit && h >= 70 && w >= 55 && (
+        <g className="pointer-events-none">
+          <rect
+            x={x + 6}
+            y={y + 6}
+            width={14 + store.unit.length * 7}
+            height={17}
+            rx={8.5}
+            fill="#ffffff"
+            opacity={0.9}
+          />
+          <text
+            x={x + 13 + (store.unit.length * 7) / 2}
+            y={y + 18.5}
+            textAnchor="middle"
+            fontSize="11"
+            fontWeight={700}
+            fill="#64748b"
+          >
+            {store.unit}
+          </text>
+        </g>
       )}
     </g>
   );

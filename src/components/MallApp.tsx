@@ -154,9 +154,9 @@ export default function MallApp() {
             </div>
           )}
 
-          {/* Temsili plan notu */}
+          {/* Plan notu */}
           <div className="absolute bottom-4 left-4 text-[11px] text-slate-400 z-10 pointer-events-none">
-            Temsili plan — gerçek kat planları entegre edilecek
+            Gerçek kat planından stilize edilmiştir — mağaza listesi kademeli olarak tamamlanıyor
           </div>
 
           {/* Mağaza detay paneli */}
@@ -240,7 +240,10 @@ function ResultList({
                 <span className="block truncate text-sm font-semibold text-slate-700">
                   {s.name}
                 </span>
-                <span className="block text-xs text-slate-400">{c.label}</span>
+                <span className="block text-xs text-slate-400">
+                  {c.label}
+                  {s.unit ? ` · No ${s.unit}` : ""}
+                </span>
               </span>
               <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
                 {s.floor}
