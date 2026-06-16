@@ -5,9 +5,11 @@ import { CATEGORIES, FLOORS, type Store } from "@/data/mall";
 export default function StorePanel({
   store,
   onClose,
+  onRoute,
 }: {
   store: Store;
   onClose: () => void;
+  onRoute: (store: Store) => void;
 }) {
   const c = CATEGORIES[store.category];
   const floorName = FLOORS.find((f) => f.id === store.floor)?.name;
@@ -48,11 +50,10 @@ export default function StorePanel({
       <div className="flex items-center gap-2 px-4 pb-4 text-sm text-slate-500">
         <span>🕒 {store.hours}</span>
         <button
-          disabled
-          title="Yakında"
-          className="ml-auto rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed"
+          onClick={() => onRoute(store)}
+          className="ml-auto rounded-full bg-anka px-4 py-2 text-xs font-semibold text-white hover:bg-anka-dark transition active:scale-95"
         >
-          Yol Tarifi (yakında)
+          🧭 Yol Tarifi
         </button>
       </div>
     </div>

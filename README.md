@@ -13,10 +13,13 @@ npm run dev   # http://localhost:3000
 
 ## Özellikler
 
-- 🗺 **4 kat**: Bodrum, Zemin, 1. Kat, 2. Kat — sağdaki kat seçiciyle geçiş
+- 🗺 **4 kat**: -1, Zemin, 1. Kat, 2. Kat — sağdaki kat seçiciyle geçiş
 - 🔍 **Arama + kategori filtresi** — sonuca tıklayınca harita o mağazaya "uçar"
   (gerekirse katı da değiştirir)
-- 🏬 **Mağaza detay paneli** — kategori, kat, çalışma saati, kampanya
+- 🧭 **Yol tarifi (wayfinding)** — herhangi iki nokta (giriş veya mağaza) arası
+  en kısa yol; katlar arası geçişte yürüyen merdiven/asansör kullanır, rotayı
+  harita üzerine animasyonlu çizer ve adım adım yön tarifi verir
+- 🏬 **Mağaza detay paneli** — kategori, kat, birim no, çalışma saati, kampanya
 - 🤏 **Pan / zoom** — fare tekerleği, sürükleme, çift tık, mobilde pinch
 - 🚻 Olanak ikonları: WC, asansör, yürüyen merdiven, danışma, ATM, mescit, bebek bakım
 - 📱 Mobil uyumlu (alt panel + üstte sonuç listesi)
@@ -25,11 +28,21 @@ npm run dev   # http://localhost:3000
 
 | Dosya | Görev |
 |---|---|
-| `src/data/mall.ts` | Tüm veri: katlar, kategoriler, mağazalar (geometri dahil), olanaklar |
-| `src/components/MapCanvas.tsx` | SVG harita motoru: pan/zoom/pinch, fly-to animasyonu, mağaza şekilleri |
-| `src/components/MallApp.tsx` | Uygulama kabuğu: arama, filtre çipleri, kat seçici, sonuç listesi |
-| `src/components/StorePanel.tsx` | Mağaza detay kartı |
+| `src/data/mall.ts` | Tüm veri: katlar, kategoriler, mağazalar (geometri dahil), olanaklar, kapılar |
+| `src/data/routing.ts` | Koridor graf modeli + Dijkstra ile en kısa yol; katlar arası geçiş |
+| `src/components/MapCanvas.tsx` | SVG harita motoru: pan/zoom/pinch, fly-to, mağaza şekilleri, rota katmanı |
+| `src/components/MallApp.tsx` | Uygulama kabuğu: arama, filtre, kat seçici, yol tarifi çubuğu |
+| `src/components/SearchSelect.tsx` | Aranabilir açılır seçici (yol tarifi nereden/nereye) |
+| `src/components/StorePanel.tsx` | Mağaza detay kartı (+ Yol Tarifi butonu) |
 | `scripts/render-preview.ts` | Tarayıcısız statik PNG önizleme üretir (`npx tsx scripts/render-preview.ts`) |
+
+## Yol tarifi nasıl çalışır?
+
+`routing.ts` her katın koridor merkez hatlarını ~25 piksel aralıkla düğümlere
+böler, komşu düğümleri birbirine bağlar. Mağaza "kapıları" ve giriş kapıları en
+yakın koridor düğümüne eklenir. Yürüyen merdiven/asansör düğümleri komşu katlara
+bir geçiş cezasıyla bağlanır. Dijkstra en kısa yolu bulur; sonuç, aktif kata
+düşen parçalar halinde haritaya çizilir, kat değişimleri işaretlenir.
 
 ## Gerçek kat planlarını entegre etme
 
@@ -41,9 +54,11 @@ npm run dev   # http://localhost:3000
 2. Her mağazanın `shape` değeri (`src/data/mall.ts`) gerçek plandaki konuma göre
    güncellenir; gerekirse `Rect` yerine serbest `polygon` desteği eklenir.
 
-## Yol haritası (faz 2)
+## Yol haritası (sonraki adımlar)
 
-- A→B rota çizimi (koridor graf modeli üzerinde en kısa yol)
-- Katlar arası rota (asansör/yürüyen merdiven düğümleri)
-- Kiosk modu ("Buradasınız" sabit nokta)
+- ✅ ~~A→B rota çizimi (koridor graf modeli üzerinde en kısa yol)~~
+- ✅ ~~Katlar arası rota (asansör/yürüyen merdiven düğümleri)~~
+- Kiosk modu ("Buradasınız" sabit nokta) ve QR ile mobile aktarma
 - Mağaza logoları ve derin bağlantılar (`/magaza/[slug]`)
+- Engelsiz rota seçeneği (sadece asansör)
+- Eksik mağazaların tamamlanması (yüksek çözünürlüklü/güncel plan ile)

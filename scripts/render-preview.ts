@@ -18,6 +18,51 @@ import {
   type FloorId,
   type Store,
 } from "../src/data/mall";
+import { findRoute, type RouteResult } from "../src/data/routing";
+
+// Demo rota: F Kapısı → Sephora (Zemin → 1. Kat geçişli)
+const DEMO = findRoute({ kind: "gate", label: "F Kapısı" }, "1-sephora");
+
+function routeOverlay(floor: FloorId, route: RouteResult | null): string {
+  if (!route) return "";
+  const segs: string[] = [];
+  let cur: string[] = [];
+  for (const n of route.nodes) {
+    if (n.floor === floor) cur.push(`${n.x},${n.y}`);
+    else if (cur.length) {
+      segs.push(cur.join(" "));
+      cur = [];
+    }
+  }
+  if (cur.length) segs.push(cur.join(" "));
+
+  const lines = segs
+    .map(
+      (pts) => `
+      <polyline points="${pts}" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="${pts}" fill="none" stroke="#e2001a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 14"/>`
+    )
+    .join("");
+
+  const transfers = route.transfers
+    .filter((t) => t.floor === floor)
+    .map(
+      (t) => `<circle cx="${t.x}" cy="${t.y}" r="17" fill="#e2001a" stroke="#fff" stroke-width="2.5"/>
+        <text x="${t.x}" y="${t.y + 5}" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">${t.dir === "up" ? "▲" : "▼"}</text>`
+    )
+    .join("");
+
+  const first = route.nodes[0];
+  const last = route.nodes[route.nodes.length - 1];
+  const pin = (x: number, y: number, color: string, label: string) =>
+    `<circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${color}" stroke-width="4"/>
+     <circle cx="${x}" cy="${y}" r="5" fill="${color}"/>
+     <text x="${x}" y="${y - 22}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${label}</text>`;
+  const start = first.floor === floor ? pin(first.x, first.y, "#16a34a", "Başlangıç") : "";
+  const end = last.floor === floor ? pin(last.x, last.y, "#e2001a", "Varış") : "";
+
+  return lines + transfers + start + end;
+}
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -121,6 +166,7 @@ function floorSvg(floor: FloorId): string {
     ${renovations}
     ${stores.map((s) => storeSvg(s)).join("")}
     ${amenitySvg}
+    ${routeOverlay(floor, DEMO)}
   </svg>`;
 }
 

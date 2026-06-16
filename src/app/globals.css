@@ -34,6 +34,17 @@ body {
   }
 }
 
+/* Rota çizgisi akış animasyonu */
+.route-dash {
+  animation: route-flow 0.8s linear infinite;
+}
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
 /* Mağaza paneli girişi */
 .panel-enter {
   animation: panel-in 0.25s ease-out;

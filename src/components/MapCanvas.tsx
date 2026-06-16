@@ -22,6 +22,7 @@ import {
   type FloorId,
   type Store,
 } from "@/data/mall";
+import type { RouteResult } from "@/data/routing";
 
 interface Transform {
   x: number;
@@ -39,6 +40,7 @@ interface MapCanvasProps {
   onSelect: (store: Store | null) => void;
   /** Değiştiğinde haritayı bu mağazaya uçurur (arama sonucundan seçim vb.) */
   focusRequest: { store: Store; token: number } | null;
+  route: RouteResult | null;
 }
 
 export default function MapCanvas({
@@ -46,6 +48,7 @@ export default function MapCanvas({
   selectedId,
   onSelect,
   focusRequest,
+  route,
 }: MapCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState<Transform>(IDENTITY);
@@ -59,6 +62,34 @@ export default function MapCanvas({
   const stores = useMemo(() => storesOnFloor(floor), [floor]);
   const amenities = useMemo(() => amenitiesOnFloor(floor), [floor]);
   const renovations = useMemo(() => renovationsOnFloor(floor), [floor]);
+
+  // Aktif kata düşen rota parçaları + uç/transfer işaretleri
+  const routeGeom = useMemo(() => {
+    if (!route) return null;
+    const polylines: string[] = [];
+    let cur: string[] = [];
+    for (const n of route.nodes) {
+      if (n.floor === floor) {
+        cur.push(`${n.x},${n.y}`);
+      } else if (cur.length) {
+        polylines.push(cur.join(" "));
+        cur = [];
+      }
+    }
+    if (cur.length) polylines.push(cur.join(" "));
+
+    const first = route.nodes[0];
+    const last = route.nodes[route.nodes.length - 1];
+    return {
+      polylines,
+      origin: first.floor === floor ? first : null,
+      destination: last.floor === floor ? last : null,
+      transfers: route.transfers.filter((t) => t.floor === floor),
+      arrivals: route.transfers
+        .filter((t) => t.toFloor === floor)
+        .map((t) => ({ ...t, dir: t.dir === "up" ? "down" : "up" })),
+    };
+  }, [route, floor]);
 
   // İstemci koordinatını SVG kullanıcı koordinatına çevirir
   const toSvgPoint = useCallback((clientX: number, clientY: number) => {
@@ -426,10 +457,117 @@ export default function MapCanvas({
                 </text>
               </g>
             ))}
+
+            {/* Rota katmanı */}
+            {routeGeom && (
+              <g className="pointer-events-none">
+                {routeGeom.polylines.map((pts, i) => (
+                  <g key={i}>
+                    <polyline
+                      points={pts}
+                      fill="none"
+                      stroke="#ffffff"
+                      strokeWidth="11"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <polyline
+                      points={pts}
+                      fill="none"
+                      stroke="#e2001a"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray="2 14"
+                      className="route-dash"
+                    />
+                  </g>
+                ))}
+
+                {/* Bu katta yukarı/aşağı geçiş işareti */}
+                {routeGeom.transfers.map((t, i) => (
+                  <RouteMarker
+                    key={`tr-${i}`}
+                    x={t.x}
+                    y={t.y}
+                    fill="#e2001a"
+                    glyph={t.dir === "up" ? "▲" : "▼"}
+                    caption={`${AMENITY_META[t.type].glyph}`}
+                  />
+                ))}
+                {routeGeom.arrivals.map((t, i) => (
+                  <RouteMarker
+                    key={`ar-${i}`}
+                    x={t.x}
+                    y={t.y}
+                    fill="#0ea5e9"
+                    glyph={t.dir === "up" ? "▲" : "▼"}
+                    caption={`${AMENITY_META[t.type].glyph}`}
+                  />
+                ))}
+
+                {routeGeom.origin && (
+                  <RoutePin x={routeGeom.origin.x} y={routeGeom.origin.y} kind="start" />
+                )}
+                {routeGeom.destination && (
+                  <RoutePin
+                    x={routeGeom.destination.x}
+                    y={routeGeom.destination.y}
+                    kind="end"
+                  />
+                )}
+              </g>
+            )}
           </g>
         </g>
       </svg>
     </div>
+  );
+}
+
+function RouteMarker({
+  x,
+  y,
+  fill,
+  glyph,
+  caption,
+}: {
+  x: number;
+  y: number;
+  fill: string;
+  glyph: string;
+  caption: string;
+}) {
+  return (
+    <g>
+      <circle cx={x} cy={y} r="17" fill={fill} stroke="#ffffff" strokeWidth="2.5" />
+      <text x={x} y={y + 5} textAnchor="middle" fontSize="15" fontWeight={700} fill="#fff">
+        {glyph}
+      </text>
+      <text x={x} y={y - 24} textAnchor="middle" fontSize="16">
+        {caption}
+      </text>
+    </g>
+  );
+}
+
+function RoutePin({ x, y, kind }: { x: number; y: number; kind: "start" | "end" }) {
+  const color = kind === "start" ? "#16a34a" : "#e2001a";
+  return (
+    <g>
+      <circle cx={x} cy={y} r="13" fill="#fff" stroke={color} strokeWidth="4" />
+      <circle cx={x} cy={y} r="5" fill={color} />
+      <text
+        x={x}
+        y={y - 22}
+        textAnchor="middle"
+        fontSize="14"
+        fontWeight={700}
+        fill={color}
+      >
+        {kind === "start" ? "Başlangıç" : "Varış"}
+      </text>
+    </g>
   );
 }
 

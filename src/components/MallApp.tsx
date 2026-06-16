@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import MapCanvas from "@/components/MapCanvas";
 import StorePanel from "@/components/StorePanel";
+import SearchSelect, { type SelectOption } from "@/components/SearchSelect";
 import {
   CATEGORIES,
   FLOORS,
@@ -11,11 +12,21 @@ import {
   type FloorId,
   type Store,
 } from "@/data/mall";
+import {
+  findRoute,
+  originOptions,
+  type OriginRef,
+} from "@/data/routing";
 
 function normalize(s: string): string {
   return s
     .toLocaleLowerCase("tr")
     .replace(/[ığüşöç]/g, (c) => ({ ı: "i", ğ: "g", ü: "u", ş: "s", ö: "o", ç: "c" })[c] ?? c);
+}
+
+function floorOfOrigin(ref: OriginRef): FloorId {
+  if (ref.kind === "gate") return "Z";
+  return STORES.find((s) => s.id === ref.id)?.floor ?? "Z";
 }
 
 export default function MallApp() {
@@ -28,6 +39,28 @@ export default function MallApp() {
     token: number;
   } | null>(null);
   const tokenRef = useRef(0);
+
+  // Yol tarifi durumu
+  const [routeMode, setRouteMode] = useState(false);
+  const [origin, setOrigin] = useState<SelectOption<OriginRef> | null>(null);
+  const [destination, setDestination] = useState<SelectOption<OriginRef> | null>(null);
+
+  const originOpts = useMemo<SelectOption<OriginRef>[]>(
+    () => originOptions().map((o) => ({ value: o.ref, label: o.label, sub: o.sub })),
+    []
+  );
+  const destOpts = useMemo<SelectOption<OriginRef>[]>(
+    () => originOpts.filter((o) => o.value.kind === "store"),
+    [originOpts]
+  );
+
+  const route = useMemo(() => {
+    if (!routeMode || !origin || !destination) return null;
+    if (destination.value.kind !== "store") return null;
+    return findRoute(origin.value, destination.value.id);
+  }, [routeMode, origin, destination]);
+
+  const routeFloors = useMemo(() => new Set(route?.floors ?? []), [route]);
 
   const results = useMemo(() => {
     const q = normalize(query.trim());
@@ -50,6 +83,43 @@ export default function MallApp() {
       requestAnimationFrame(() => setFocusRequest({ store, token }))
     );
   };
+
+  const startRouteTo = (store: Store) => {
+    const destOpt = destOpts.find(
+      (o) => o.value.kind === "store" && o.value.id === store.id
+    );
+    if (!destOpt) return;
+    setDestination(destOpt);
+    if (!origin) setOrigin(originOpts.find((o) => o.label === "A Kapısı") ?? originOpts[0]);
+    setRouteMode(true);
+    setSelected(null);
+    setFloor(store.floor);
+  };
+
+  const closeRoute = () => {
+    setRouteMode(false);
+    setOrigin(null);
+    setDestination(null);
+  };
+
+  const swap = () => {
+    if (origin?.value.kind === "store" && destination) {
+      const o = origin;
+      setOrigin(destination);
+      setDestination(o);
+    }
+  };
+
+  // Rota oluştuğunda başlangıç katını göster
+  const lastRouteKey = useRef<string>("");
+  if (route) {
+    const key = `${origin?.label}->${destination?.label}`;
+    if (key !== lastRouteKey.current) {
+      lastRouteKey.current = key;
+      const startFloor = origin ? floorOfOrigin(origin.value) : "Z";
+      if (startFloor !== floor) setFloor(startFloor);
+    }
+  }
 
   return (
     <div className="flex flex-col h-dvh bg-slate-100">
@@ -74,7 +144,75 @@ export default function MallApp() {
             🔍
           </span>
         </div>
+        <button
+          onClick={() => (routeMode ? closeRoute() : setRouteMode(true))}
+          className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold border transition ${
+            routeMode
+              ? "bg-anka text-white border-anka"
+              : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+          }`}
+        >
+          🧭 <span className="hidden sm:inline">Yol Tarifi</span>
+        </button>
       </header>
+
+      {/* Yol tarifi çubuğu */}
+      {routeMode && (
+        <div className="bg-white border-b border-slate-200 px-4 py-3 z-10 shadow-sm">
+          <div className="flex items-center gap-2 max-w-3xl">
+            <SearchSelect
+              options={originOpts}
+              value={origin}
+              onChange={setOrigin}
+              placeholder="Nereden? (giriş veya mağaza)"
+              accent="#16a34a"
+            />
+            <button
+              onClick={swap}
+              title="Başlangıç ve varışı değiştir"
+              className="shrink-0 h-9 w-9 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 transition"
+            >
+              ⇄
+            </button>
+            <SearchSelect
+              options={destOpts}
+              value={destination}
+              onChange={setDestination}
+              placeholder="Nereye? (mağaza)"
+              accent="#e2001a"
+            />
+            <button
+              onClick={closeRoute}
+              className="shrink-0 h-9 w-9 rounded-lg text-slate-400 hover:bg-slate-100 transition"
+              aria-label="Kapat"
+            >
+              ✕
+            </button>
+          </div>
+
+          {route && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm max-w-3xl">
+              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-anka">
+                ~{route.meters} m
+              </span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                {route.floors.map((f) => FLOORS.find((x) => x.id === f)?.shortLabel).join(" → ")}
+              </span>
+              {route.steps.map((s, i) => (
+                <span key={i} className="flex items-center gap-1 text-xs text-slate-500">
+                  {i > 0 && <span className="text-slate-300">›</span>}
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+          {routeMode && origin && destination && !route && (
+            <div className="mt-2 text-xs text-amber-600">
+              Bu iki nokta arasında rota bulunamadı.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Kategori çipleri */}
       <div className="flex gap-2 px-4 py-2.5 bg-white border-b border-slate-200 overflow-x-auto z-10 [scrollbar-width:none]">
@@ -114,27 +252,34 @@ export default function MallApp() {
             selectedId={selected?.id ?? null}
             onSelect={setSelected}
             focusRequest={focusRequest}
+            route={route}
           />
 
           {/* Kat seçici */}
           <div className="absolute top-4 right-4 flex flex-col rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden z-10">
-            {FLOORS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => {
-                  setFloor(f.id);
-                  setSelected(null);
-                }}
-                className={`w-12 h-12 text-sm font-bold transition ${
-                  floor === f.id
-                    ? "bg-anka text-white"
-                    : "text-slate-500 hover:bg-slate-50"
-                }`}
-                title={f.name}
-              >
-                {f.shortLabel}
-              </button>
-            ))}
+            {FLOORS.map((f) => {
+              const inRoute = routeFloors.has(f.id);
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setFloor(f.id);
+                    setSelected(null);
+                  }}
+                  className={`relative w-12 h-12 text-sm font-bold transition ${
+                    floor === f.id
+                      ? "bg-anka text-white"
+                      : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                  title={f.name}
+                >
+                  {f.shortLabel}
+                  {inRoute && floor !== f.id && (
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-anka" />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Aktif kat etiketi */}
@@ -143,7 +288,7 @@ export default function MallApp() {
           </div>
 
           {/* Mobil: filtreli sonuç listesi haritanın üstünde */}
-          {isFiltering && !selected && (
+          {isFiltering && !selected && !routeMode && (
             <div className="lg:hidden absolute left-3 right-3 top-16 max-h-64 overflow-y-auto rounded-2xl bg-white shadow-xl border border-slate-200 z-10">
               <ResultList
                 stores={results}
@@ -161,7 +306,11 @@ export default function MallApp() {
 
           {/* Mağaza detay paneli */}
           {selected && (
-            <StorePanel store={selected} onClose={() => setSelected(null)} />
+            <StorePanel
+              store={selected}
+              onClose={() => setSelected(null)}
+              onRoute={startRouteTo}
+            />
           )}
         </main>
       </div>
